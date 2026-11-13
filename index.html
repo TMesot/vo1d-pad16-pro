@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A cheap tablet that fakes almost all of its hardware, and ships with a botnet</title>
+<meta name="description" content="Relatives bought a suspiciously cheap 'Pad 16 Pro' tablet and asked me to take a look. The specs were fake, and the firmware ships with a Vo1d-family bot.">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="A cheap tablet that fakes almost all of its hardware, and ships with a botnet">
+<meta property="og:description" content="Relatives bought a 'Pad 16 Pro' on AliExpress and asked me to take a look. Notes from a side quest that got out of hand.">
+<meta property="og:image" content="https://tmesot.github.io/vo1d-pad16-pro/img/listing.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<style>
+  :root{
+    --bg:#fcfcfb; --surface:#f2f3f1; --text:#1c2126; --muted:#5d6670;
+    --border:#dfe2e0; --accent:#1f4e79;
+    --mono:ui-monospace,"SFMono-Regular","Cascadia Code",Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  }
+  @media (prefers-color-scheme:dark){ :root{
+    --bg:#101418; --surface:#1a2026; --text:#e4e8ec; --muted:#98a3ae;
+    --border:#2a323b; --accent:#9cc0e6;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    font-size:18px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+  header{padding:72px 0 8px}
+  h1{font-family:var(--serif);font-size:2.4em;max-width:22em;line-height:1.12;letter-spacing:-.015em;margin:0 0 .45em;text-wrap:balance}
+  .lede{font-size:1.15em;color:var(--muted);margin:0 0 1.2em;max-width:40em}
+  .meta{font-family:var(--mono);font-size:.72em;color:var(--muted);letter-spacing:.04em}
+  h2{font-family:var(--serif);font-size:1.5em;line-height:1.2;margin:2.6em 0 .5em;
+    padding-top:1.1em;border-top:1px solid var(--border)}
+  h3{font-size:1.05em;margin:2em 0 .3em}
+  p{margin:.9em 0}
+  ul,ol{margin:.9em 0;padding-left:1.25em}
+  li{margin:.5em 0}
+  a{color:var(--accent);text-underline-offset:.15em}
+  code{font-family:var(--mono);font-size:.84em;background:var(--surface);
+    padding:.1em .35em;border-radius:3px;overflow-wrap:anywhere}
+  figure{margin:1.8em 0}
+  img{max-width:100%;height:auto;display:block;border:1px solid var(--border);border-radius:4px}
+  figcaption{color:var(--muted);font-size:.82em;margin-top:.6em;line-height:1.5}
+  .tablewrap{overflow-x:auto;margin:1.4em 0}
+  table{border-collapse:collapse;width:100%;font-size:.88em}
+  th,td{text-align:left;padding:8px 14px 8px 0;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-size:.8em;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  td:first-child{color:var(--muted)}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin:1.8em 0}
+  .pair figure{margin:0}
+  .tag{font-family:var(--mono);font-size:.72em;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 .6em}
+  @media(max-width:720px){.pair{grid-template-columns:1fr}h1{font-size:1.9em}}
+  footer p{margin:.4em 0}
+  footer{margin-top:4em;padding:24px 0 64px;border-top:1px solid var(--border);
+    color:var(--muted);font-size:.82em}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>A cheap tablet that fakes almost all of its hardware, and ships with a botnet</h1>
+  <p class="lede">Relatives bought a "Pad 16 Pro" on AliExpress and asked me to take a look. Notes from a side quest that got out of hand.</p>
+  <p class="meta">13 November 2026 · Android · firmware malware</p>
+</header>
+
+<main class="wrap">
+
+<h2 id="story">The story</h2>
+<p>Relatives of mine ordered a tablet on AliExpress a few weeks ago: a "2026 Pad 16 PRO" with a Snapdragon 8 Gen 3, 16 GB of RAM, 1 TB of storage and Android 15, for CHF 103.99. Once it arrived they had second thoughts and gave it to me before putting it on their Wi-Fi.</p>
+<p>I expected fake specs, and I got them. What I did not expect was to spend the rest of the day in Ghidra. The firmware lies about the hardware, rewrites what benchmark apps show on screen, and has a bot from the Vo1d family linked into one of Android's core libraries.</p>
+<p>Here are the main findings.</p>
+
+<h2 id="findings">What I found</h2>
+
+<h3>1. The hardware is not what was sold</h3>
+<p>The funny part first: the order was for the 16 GB + 1 TB variant, and the tablet's own Settings screen claims 24 GB of RAM, 2039 GB of storage and "Android 16". A free upgrade to the top model, apparently. Faking the bigger number costs the same as faking the smaller one. A small open-source hardware-info app from F-Droid, which the firmware does not know about, tells a different story. More on why that matters in the next section.</p>
+
+<figure>
+  <p class="tag">What was sold</p>
+  <img src="img/listing.png" alt="AliExpress listing for the 2026 Pad 16 PRO, advertising a Snapdragon 8 Gen 3, at CHF 103.99">
+  <figcaption>The listing, as ordered: the 16 GB + 1 TB variant at CHF 103.99.</figcaption>
+</figure>
+
+<div class="pair">
+  <figure>
+    <p class="tag">What Settings claims</p>
+    <img src="img/settings.png" alt="The tablet's Settings screen, in French, showing 24.0 GB of memory and 2039 GB of storage available">
+    <figcaption>The tablet's own Settings screen: 24 GB of memory and 2039 GB of storage. More than was paid for.</figcaption>
+  </figure>
+  <figure>
+    <p class="tag">What is really inside</p>
+    <img src="img/device.png" alt="Hardware info app on the tablet showing a MediaTek MT6750V/C with 8 cores">
+    <figcaption>The "Snapdragon 8 Gen 3", read on the tablet itself: a MediaTek MT6750 with eight cores.</figcaption>
+  </figure>
+</div>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>Sold as</th><th>Actually</th></tr></thead>
+  <tbody>
+    <tr><td>Snapdragon 8 Gen 3</td><td>MediaTek MT6750, a budget chip from 2016</td></tr>
+    <tr><td>16 GB RAM</td><td>4 GB at most (the chip's limit). The kernel is patched to report exactly 24 GB</td></tr>
+    <tr><td>1 TB storage</td><td>23 GB usable</td></tr>
+    <tr><td>Android 15</td><td>Android 10, March 2021 security patch, 2016 kernel</td></tr>
+    <tr><td>2560 × 1600 display</td><td>800 × 1280</td></tr>
+    <tr><td>20000 mAh battery</td><td>4350 mAh</td></tr>
+    <tr><td>5G</td><td>a 2016 4G modem</td></tr>
+  </tbody>
+</table></div>
+
+<p>The build fingerprint is copied from a Gionee P61, a phone that sits on Google's certified-device list, so the tablet also introduces itself to Google Play as somebody else. The IMEI and MAC address are probably self-assigned too, rather than properly allocated: the MAC prefix is not registered to any manufacturer, and a factory tool left on the tablet exists to write both.</p>
+
+<h3>2. The firmware defends the lie</h3>
+<p>Faking the numbers in Settings is the "easy" part. Someone also went to real effort to stop buyers from checking with the usual tools.</p>
+
+<p>To get a second opinion on what Settings was telling me, I reached for CPU-Z, the app most people use to see which chip is really inside a device. It would not install. Every version I tried, and CPU-Z Advance too, failed with <code>INSTALL_FAILED_INVALID_APK</code>, and re-signing it with my own key changed nothing. So I looked for something less famous and found <a href="https://f-droid.org/packages/com.kgurgul.cpuinfo/">CPU Info on F-Droid</a>, a small open-source app that installed on the first try and showed the MediaTek chip from the screenshot above.</p>
+
+<p>Decompiling <code>framework.jar</code> explained why. Android's <code>TextView</code>, the class every app uses to draw text, has been patched with a list of 17 benchmark and device-info apps: AnTuTu, AIDA64, DevCheck, CPU-Z, CPU-X and a dozen more. When one of them is on screen, the patched code watches the labels the app draws, such as "CPU model" or "Frequency", and swaps the value next to them for one stored in <code>persist.sys.lz.*</code> system properties. On this tablet those properties read <code>Snapdragon 8 Gen3</code>, 24 GB of RAM, 2048 GB of storage, Android 16 and a 25000 mAh battery. The app measures the real hardware correctly, and the lie is painted over the result as it is drawn. The same code can rewrite AnTuTu's benchmark score and its "genuine device" verdict.</p>
+
+<p>CPU-Z, being one of the best-known tools, is simply refused at install. CPU Info is not on the list, which is why it tells the truth. An interesting piece of work, honestly. But stay with me, because the fake specs turned out to be the least of it.</p>
+
+<h3>3. There is a bot in the firmware</h3>
+<p>This is the part that matters. <code>libandroid_runtime.so</code> is a core Android library that gets loaded into every app. On this tablet it has about sixty extra functions linked into it, and the Zygote routine that sets up each new app process (<code>SpecializeCommon</code>) has been modified to call them. In practice, every app you open starts with the bot already inside it.</p>
+<p>From the decompiled code, the bot:</p>
+<ul>
+  <li>calls a hardcoded server, <code>3.132.75.97</code> on TCP 55530, and expects an RSA-2048 encrypted list of command servers back;</li>
+  <li>falls back to 480 generated <code>.com</code> domains if that server is gone;</li>
+  <li>reports which app it is running in and waits for tasks;</li>
+  <li>downloads plugins and loads them straight into the host app, as DEX code in memory or as native libraries, and can run shell commands.</li>
+</ul>
+<p>That IP address is <a href="https://threatfox.abuse.ch/ioc/1484905/">already listed on ThreatFox</a> as a Vo1d command server, and the protocol, port range, encryption and domain generator all match the published research on Vo1d (XLab's <a href="https://blog.xlab.qianxin.com/long-live-the-vo1d_botnet/">Long Live The Vo1d Botnet</a> is the reference write-up), a botnet that rents out infected devices as residential proxies and runs ad fraud. Public reports describe Vo1d on Android TV boxes. Here it is linked into the runtime of a tablet sold as new, in a firmware build dated 29 October 2026.</p>
+<p>The code lives on the signed system partition, so a factory reset does not remove it, and there is no clean firmware to flash on a no-name clone.</p>
+
+<h3>4. A quick tour of the preinstalled apps</h3>
+<p>After all that, a small tour of the preinstalled apps felt worth the time. I pulled the dozen or so that are not stock Android, Google or MediaTek, and opened them in jadx.</p>
+<ul>
+  <li>The "system updater" sends the IMEI, MAC address, model and brand to <code>fota.atsota.com</code>, and silently installs whatever APK the server hands back.</li>
+  <li>A hidden installer adds Facebook, TikTok and YouTube on first boot. Those are the official apps, with genuine Meta, TikTok and Google signatures. They still run with the bot inside them, like every other app on the tablet.</li>
+  <li>A Baidu location library (<code>com.baidu.map.location</code>) sits in the privileged system apps and fails signature verification: its v2 signature was stripped, which usually means the APK was modified after signing.</li>
+  <li>A search widget (<code>com.nyn.search</code>) is signed with a blank certificate, every field set to <code>0</code>, and holds permissions to change secure system settings and act across user profiles.</li>
+  <li>An app called <code>com.example.noapp</code>, the placeholder name from Android Studio's project template, runs with full system privileges. I found no meaningful code in it.</li>
+  <li>Factory tools left in the retail build write the IMEI and MAC address and set the fake spec values. A Verizon SIM-lock service is there too, for no obvious reason.</li>
+</ul>
+
+<h2 id="actions">What I did about it</h2>
+<ol>
+  <li><strong>Wrote to the seller.</strong> The store is a trading company registered about four months before the sale, so I have my doubts about how surprised they will be. It is still where a refund starts, and it puts the findings on record.</li>
+  <li><strong>Reported it to AliExpress.</strong> A dispute for the order, and a report on the listing itself with the evidence: the spec comparison, the hashes and the ThreatFox entry.</li>
+  <li><strong>Sent the samples to MalwareBazaar.</strong> Both infected libraries are there, so antivirus vendors and other researchers can pick this build up.</li>
+</ol>
+
+<h2 id="iocs">Indicators</h2>
+<div class="tablewrap"><table>
+<tbody>
+<tr><td>SHA-256, arm64</td><td><a href="https://bazaar.abuse.ch/sample/04e6f503542e4bcf0e8dc51bc97c9698f2c212c664549ebed225ca92e497dc1a/"><code>04e6f503542e4bcf0e8dc51bc97c9698f2c212c664549ebed225ca92e497dc1a</code></a></td></tr>
+<tr><td>SHA-256, arm32</td><td><a href="https://bazaar.abuse.ch/sample/5bc0839e87e68f192f90c6f2923bea7f739690a412b4b054118107c331119581/"><code>5bc0839e87e68f192f90c6f2923bea7f739690a412b4b054118107c331119581</code></a></td></tr>
+<tr><td>Path</td><td><code>/system/lib64/libandroid_runtime.so</code>, <code>/system/lib/libandroid_runtime.so</code></td></tr>
+<tr><td>Bootstrap server</td><td><code>3.132.75.97</code>, TCP 55530 (ThreatFox: <a href="https://threatfox.abuse.ch/ioc/1484910/">55530</a>, <a href="https://threatfox.abuse.ch/ioc/1484905/">55520</a>)</td></tr>
+<tr><td>Domain generator</td><td>4 seeds, 120 <code>.com</code> domains each, first five characters mutated</td></tr>
+<tr><td>Payload entry class</td><td><code>com.plg.init.Zygote</code></td></tr>
+<tr><td>Dropped files</td><td><code>&lt;app data&gt;/.z.dex</code>, <code>/data/system/packages-vendor.list</code></td></tr>
+<tr><td>Spec spoofing</td><td><code>framework.jar</code> (patched <code>android.widget.TextView</code>), <code>persist.sys.lz.*</code></td></tr>
+<tr><td>Updater</td><td><code>com.otauc.aiot.tbx.fota</code>, <code>fota.atsota.com</code></td></tr>
+<tr><td>Firmware build</td><td><code>P510S_V6.0_CE_XHUI_P10_PTH_Z50_OVERSEA_ZZNY30105125_Z332_20261029</code></td></tr>
+</tbody>
+</table></div>
+
+<h2 id="method">How I looked</h2>
+<p>ADB over USB as the normal shell user, with no root and no flashing. The tablet never joined a network, and the only thing I installed on it was the hardware-info app. The rest is static analysis: Ghidra and radare2 for the native library, jadx for the framework and the apps, apksigner for signatures. Nothing from the tablet was ever run on my machine.</p>
+<p>The price of keeping it offline is that I never saw the bot talk to its server or fetch a second stage. That would be a second step, if time permits.</p>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Personal research, done in my own time. Questions or corrections: <a href="https://github.com/TMesot/vo1d-pad16-pro/issues">open an issue on GitHub</a>, or reach me on <a href="https://www.linkedin.com/in/titouan-mesot-b45b3115a/">LinkedIn</a>.</p>
+    <p>Product and company names appear for identification only.</p>
+  </div>
+</footer>
+
+</body>
+</html>
